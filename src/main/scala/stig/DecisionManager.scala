@@ -238,7 +238,11 @@ private final class DecisionContextImpl(
     signal.later
   }
 
-  override def scheduleActivity(activity: Activity, input: String): Later[String] = {
+  override def scheduleActivity(
+    activity: Activity,
+    taskList: String,
+    input: String): Later[String] = {
+
     val signal = Signal[String]()
 
     // Generate a predictable id
@@ -256,8 +260,11 @@ private final class DecisionContextImpl(
                 .withName(activity.name)
                 .withVersion(activity.version))
             .withInput(input)
+            .withStartToCloseTimeout("NONE")
+            .withScheduleToStartTimeout("NONE")
             .withScheduleToCloseTimeout("NONE")
-            .withHeartbeatTimeout("NONE"))
+            .withHeartbeatTimeout("NONE")
+            .withTaskList(new TaskList().withName(taskList)))
     }
 
     // Remember the promise
@@ -324,7 +331,7 @@ private final class DecisionContextImpl(
 }
 
 trait DeciderContext {
-  def scheduleActivity(activity: Activity, input: String): Later[String]
+  def scheduleActivity(activity: Activity, taskList: String, input: String): Later[String]
   def completeWorkflow(result: String)
   def failWorkflow(details: String, reason: String)
   def startTimer(timeout: Int): Later[Unit]
