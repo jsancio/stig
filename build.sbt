@@ -1,8 +1,6 @@
-name := "workflow"
+name := "stig"
 
 scalaVersion := "2.10.3"
-
-scalariformSettings
 
 assemblySettings
 
@@ -14,3 +12,7 @@ libraryDependencies ++= Seq(
   "org.slf4j" % "jcl-over-slf4j" % "1.7.6",
   "org.joda" % "joda-convert" % "1.6",
   "joda-time" % "joda-time" % "2.3")
+
+
+scalariformSettings
+
