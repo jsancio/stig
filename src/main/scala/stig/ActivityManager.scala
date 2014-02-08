@@ -13,6 +13,8 @@ import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflow
 import com.amazonaws.services.simpleworkflow.model._
 import grizzled.slf4j.Logging
 
+import stig.model.Activity
+
 final class ActivityManager(
     domain: String,
     taskList: String,
@@ -128,7 +130,5 @@ object ActivityManager {
 private final class WorkerContextImpl extends WorkerContext
 
 trait WorkerContext
-
-case class Activity(name: String, version: String)
 
 case class ActivityRegistration(activity: Activity, worker: ActivityManager.Worker)

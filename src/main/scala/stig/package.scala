@@ -45,4 +45,6 @@ package object stig {
       opened.getExecutionInfos.asScala ++ closed.getExecutionInfos.asScala
     }
   }
+
+  type Decider = (DeciderContext, String) => Unit
 }

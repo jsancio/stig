@@ -2,13 +2,13 @@ package stig.script
 
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowClient
 
-import stig.Activity
 import stig.ActivityManager
 import stig.ActivityRegistration
 import stig.DeciderContext
 import stig.DeciderRegistration
 import stig.DecisionManager
 import stig.model.Workflow
+import stig.model.Activity
 import stig.WorkerContext
 
 object SimpleTest extends App {
