@@ -11,17 +11,7 @@ import grizzled.slf4j.Logging
 import stig.model.Activity
 import stig.model.Workflow
 import stig.model.Decision
-import stig.model.ContinueAsNewWorkflow
-import stig.model.StartChildWorkflow
-import stig.model.CompleteWorkflow
-import stig.model.FailWorkflow
-import stig.model.ScheduleActivityTask
-import stig.model.StartTimer
 import stig.model.WorkflowEvent
-import stig.model.ActivityTaskScheduled
-import stig.model.TimerFired
-import stig.model.ActivityTaskCompleted
-import stig.model.WorkflowExecutionStarted
 import stig.util.{ Later, Signal }
 
 final class DecisionImpl()
@@ -65,13 +55,13 @@ final class DecisionImpl()
 
       try {
         genericEvent match {
-          case event: WorkflowExecutionStarted =>
+          case event: WorkflowEvent.WorkflowExecutionStarted =>
             handleWorkflowExecutionStarted(event, deciders)
 
-          case event: ActivityTaskCompleted =>
+          case event: WorkflowEvent.ActivityTaskCompleted =>
             handleActivityTaskCompleted(event, state)
 
-          case event: TimerFired =>
+          case event: WorkflowEvent.TimerFired =>
             handleTimerFired(event)
 
           case _ =>
@@ -100,7 +90,7 @@ final class DecisionImpl()
   }
 
   private[this] def handleWorkflowExecutionStarted(
-    event: WorkflowExecutionStarted,
+    event: WorkflowEvent.WorkflowExecutionStarted,
     deciders: Map[Workflow, Decider]): Option[Throwable] = {
     info(s"Handling workflow started event: ${event.id}")
 
@@ -114,13 +104,13 @@ final class DecisionImpl()
   }
 
   private[this] def handleActivityTaskCompleted(
-    event: ActivityTaskCompleted,
+    event: WorkflowEvent.ActivityTaskCompleted,
     state: Map[Long, WorkflowEvent]): Option[Throwable] = {
 
     info(s"Handling activity completed event: ${event.id}")
 
     // Handle activity task completed event
-    val task = state(event.scheduledEventId).asInstanceOf[ActivityTaskScheduled]
+    val task = state(event.scheduledEventId).asInstanceOf[WorkflowEvent.ActivityTaskScheduled]
 
     val id = task.activityId.toInt
     val signal = removeSignal(id)
@@ -134,7 +124,7 @@ final class DecisionImpl()
     }
   }
 
-  private[this] def handleTimerFired(event: TimerFired): Option[Throwable] = {
+  private[this] def handleTimerFired(event: WorkflowEvent.TimerFired): Option[Throwable] = {
     info(s"Handling timer fired event: ${event.id}")
 
     val signal = removeSignal(event.timerId.toInt)
@@ -163,7 +153,7 @@ trait InternalDeciderContext extends DeciderContext {
 
     // If this is a replay then don't remember the decision
     if (isLive) {
-      decisions += StartTimer(id, timeout.milliseconds)
+      decisions += Decision.StartTimer(id, timeout.milliseconds)
     }
 
     // Remember the promise
@@ -181,7 +171,7 @@ trait InternalDeciderContext extends DeciderContext {
 
     // If this is a replay then don't remember the decision
     if (isLive) {
-      decisions += ScheduleActivityTask(activity, taskList, id, input)
+      decisions += Decision.ScheduleActivityTask(activity, taskList, id, input)
     }
 
     // Remember the promise
@@ -192,25 +182,25 @@ trait InternalDeciderContext extends DeciderContext {
 
   def completeWorkflow(result: String) {
     if (isLive) {
-      decisions += CompleteWorkflow(result)
+      decisions += Decision.CompleteWorkflow(result)
     }
   }
 
   def failWorkflow(reason: String, details: String) {
     if (isLive) {
-      decisions += FailWorkflow(reason, details)
+      decisions += Decision.FailWorkflow(reason, details)
     }
   }
 
   def startChildWorkflow(workflow: Workflow, input: String): Unit = {
     if (isLive) {
-      decisions += StartChildWorkflow(UUID.randomUUID.toString, workflow, input)
+      decisions += Decision.StartChildWorkflow(UUID.randomUUID.toString, workflow, input)
     }
   }
 
   def continueAsNewWorkflow(input: String): Unit = {
     if (isLive) {
-      decisions += ContinueAsNewWorkflow(input)
+      decisions += Decision.ContinueAsNewWorkflow(input)
     }
   }
 }

@@ -16,27 +16,30 @@ import com.amazonaws.services.simpleworkflow.model.{ Decision => SWFDecision }
 
 sealed trait Decision
 
-case class ContinueAsNewWorkflow(input: String) extends Decision
-case class StartChildWorkflow(id: String, workflow: Workflow, input: String) extends Decision
-case class FailWorkflow(reason: String, details: String) extends Decision
-case class CompleteWorkflow(result: String) extends Decision
-case class ScheduleActivityTask(
-  activity: Activity,
-  taskList: String,
-  id: Int,
-  input: String) extends Decision
-case class StartTimer(id: Int, timeout: Duration) extends Decision
+object Decision {
+  final case class ContinueAsNewWorkflow(input: String) extends Decision
+  final case class StartChildWorkflow(id: String, workflow: Workflow, input: String)
+    extends Decision
+  final case class FailWorkflow(reason: String, details: String) extends Decision
+  final case class CompleteWorkflow(result: String) extends Decision
+  final case class ScheduleActivityTask(
+    activity: Activity,
+    taskList: String,
+    id: Int,
+    input: String) extends Decision
+  final case class StartTimer(id: Int, timeout: Duration) extends Decision
+}
 
 object DecisionConverter {
   def convert(decision: Decision): SWFDecision = decision match {
-    case ContinueAsNewWorkflow(input) =>
+    case Decision.ContinueAsNewWorkflow(input) =>
       new SWFDecision()
         .withDecisionType(DecisionType.ContinueAsNewWorkflowExecution)
         .withContinueAsNewWorkflowExecutionDecisionAttributes(
           new ContinueAsNewWorkflowExecutionDecisionAttributes()
             .withInput(input))
 
-    case StartChildWorkflow(id, workflow, input) =>
+    case Decision.StartChildWorkflow(id, workflow, input) =>
       new SWFDecision()
         .withDecisionType(DecisionType.StartChildWorkflowExecution)
         .withStartChildWorkflowExecutionDecisionAttributes(
@@ -47,7 +50,7 @@ object DecisionConverter {
               .withName(workflow.name)
               .withVersion(workflow.version)))
 
-    case FailWorkflow(reason, details) =>
+    case Decision.FailWorkflow(reason, details) =>
       new SWFDecision()
         .withDecisionType(DecisionType.FailWorkflowExecution)
         .withFailWorkflowExecutionDecisionAttributes(
@@ -55,14 +58,14 @@ object DecisionConverter {
             .withDetails(details)
             .withReason(reason))
 
-    case CompleteWorkflow(result) =>
+    case Decision.CompleteWorkflow(result) =>
       new SWFDecision()
         .withDecisionType(DecisionType.CompleteWorkflowExecution)
         .withCompleteWorkflowExecutionDecisionAttributes(
           new CompleteWorkflowExecutionDecisionAttributes()
             .withResult(result))
 
-    case ScheduleActivityTask(activity, taskList, id, input) =>
+    case Decision.ScheduleActivityTask(activity, taskList, id, input) =>
       new SWFDecision()
         .withDecisionType(DecisionType.ScheduleActivityTask)
         .withScheduleActivityTaskDecisionAttributes(
@@ -79,7 +82,7 @@ object DecisionConverter {
             .withHeartbeatTimeout("NONE")
             .withTaskList(new TaskList().withName(taskList)))
 
-    case StartTimer(id, timeout) =>
+    case Decision.StartTimer(id, timeout) =>
       new SWFDecision()
         .withDecisionType(DecisionType.StartTimer)
         .withStartTimerDecisionAttributes(
@@ -88,7 +91,3 @@ object DecisionConverter {
             .withStartToFireTimeout(timeout.toString))
   }
 }
-
-// TODO: Move this out of here
-
-case class Activity(name: String, version: String)

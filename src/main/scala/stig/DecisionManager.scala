@@ -13,21 +13,7 @@ import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflow
 import com.amazonaws.services.simpleworkflow.model._
 import grizzled.slf4j.Logging
 
-import stig.model.ActivityTaskCompleted
-import stig.model.ActivityTaskScheduled
-import stig.model.Activity
-import stig.model.Decision
-import stig.model.TimerFired
-import stig.model.Workflow
-import stig.model.WorkflowEvent
-import stig.model.WorkflowExecutionStarted
-import stig.model.ContinueAsNewWorkflow
-import stig.model.CompleteWorkflow
-import stig.model.StartChildWorkflow
-import stig.model.FailWorkflow
-import stig.model.ScheduleActivityTask
-import stig.model.StartTimer
-import stig.model.DecisionConverter
+import stig.model.{ Activity, Decision, Workflow, WorkflowEvent, DecisionConverter }
 import stig.util.{ Signal, Later }
 
 final class DecisionManager(
