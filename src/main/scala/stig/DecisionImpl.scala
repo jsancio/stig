@@ -8,11 +8,8 @@ import scala.util.control.NonFatal
 
 import grizzled.slf4j.Logging
 
-import stig.model.Activity
-import stig.model.Workflow
-import stig.model.Decision
-import stig.model.WorkflowEvent
-import stig.util.{ Later, Signal }
+import model.{ Activity, Workflow, Decision, WorkflowEvent }
+import util.{ Later, Signal }
 
 final class DecisionImpl(previousId: Long, newId: Long)
     extends InternalDeciderContext with Logging {

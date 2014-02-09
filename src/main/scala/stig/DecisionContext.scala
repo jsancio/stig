@@ -1,7 +1,7 @@
 package stig
 
-import stig.model.{ Activity, Workflow }
-import stig.util.Later
+import model.{ Activity, Workflow }
+import util.Later
 
 trait DeciderContext {
   def startTimer(timeout: Int): Later[Unit]

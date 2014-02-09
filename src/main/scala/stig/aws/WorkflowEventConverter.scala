@@ -1,4 +1,4 @@
-package stig
+package stig.aws
 
 import org.joda.time.DateTime
 import com.amazonaws.services.simpleworkflow.model.HistoryEvent

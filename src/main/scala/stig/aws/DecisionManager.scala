@@ -1,17 +1,18 @@
-package stig
+package stig.aws
 
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
-import java.lang.management.ManagementFactory
 import java.util.concurrent.Executors
 
-import collection.JavaConverters._
-import concurrent.{ Future, ExecutionContext, ExecutionContextExecutorService }
+import scala.collection.JavaConverters._
+import scala.concurrent.{ Future, ExecutionContext, ExecutionContextExecutorService }
 
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflow
 import com.amazonaws.services.simpleworkflow.model._
 import grizzled.slf4j.Logging
 
-import stig.model.{ Decision, Workflow, DecisionConverter }
+import util.actorName
+import stig.{ Decider, WorkflowEventsProcessor }
+import stig.model.{ Decision, Workflow }
 
 final class DecisionManager(
     domain: String,
@@ -40,12 +41,7 @@ final class DecisionManager(
 
   private def run(): Unit = {
     try {
-      val name = {
-        val vmName = ManagementFactory.getRuntimeMXBean.getName
-        val threadId = Thread.currentThread.getName
-
-        s"$threadId:$vmName"
-      }
+      val name = actorName
 
       while (!shutdown) {
         info("Waiting on a decision task")

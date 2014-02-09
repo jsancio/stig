@@ -1,6 +1,6 @@
 package stig
 
-import stig.model.{ WorkflowEvent, Workflow, Decision }
+import model.{ WorkflowEvent, Workflow, Decision }
 
 object WorkflowEventsProcessor {
   def makeDecisions(

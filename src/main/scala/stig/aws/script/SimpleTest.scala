@@ -1,13 +1,10 @@
-package stig.script
+package stig.aws.script
 
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowClient
 
-import stig.ActivityManager
-import stig.ActivityRegistration
-import stig.DeciderContext
-import stig.DecisionManager
+import stig.aws.{ DecisionManager, ActivityManager }
 import stig.model.{ Workflow, Activity }
-import stig.WorkerContext
+import stig.{ DeciderContext, WorkerContext }
 
 object SimpleTest extends App {
   val client = new AmazonSimpleWorkflowClient()
@@ -26,7 +23,7 @@ object SimpleTest extends App {
     domain,
     taskList,
     client,
-    Seq(ActivityRegistration(Activity("simple-activity", "1.0"), activity)))
+    Map(Activity("simple-activity", "1.0") -> activity))
 
   decisionManager.start()
   activityManager.start()
@@ -37,10 +34,7 @@ object SimpleTest extends App {
 
   def decider(context: DeciderContext, input: String): Unit = {
     for {
-      result <- context.scheduleActivity(
-        Activity("simple-activity", "1.0"),
-        taskList,
-        "cool input")
+      result <- context.scheduleActivity(Activity("simple-activity", "1.0"), taskList, input)
     } {
       context.completeWorkflow(s"decider's result: $result")
     }
