@@ -14,14 +14,11 @@ import stig.model.Decision
 import stig.model.WorkflowEvent
 import stig.util.{ Later, Signal }
 
-final class DecisionImpl()
-    extends InternalDeciderContext
-    with WorkflowEventsProcessor with Logging {
+final class DecisionImpl(previousId: Long, newId: Long)
+    extends InternalDeciderContext with Logging {
 
   private[this] var currentId = 0L
-  private[this] var previousId = 0L
-  private[this] var newId = 0L
-  private[this] var state = 0
+  private[this] var actionId = 0
 
   val decisions = mutable.Buffer.empty[Decision]
   val promises = mutable.Map.empty[Int, Signal[_]]
@@ -33,19 +30,14 @@ final class DecisionImpl()
   def isLive: Boolean = (currentId > previousId && currentId < newId)
 
   def nextId(): Int = {
-    state = state + 1
-    state
+    actionId += 1
+    actionId
   }
 
   // TODO: communicate error
-  override def makeDecisions(
-    previousId: Long,
-    newId: Long,
+  def makeDecisions(
     events: Iterable[WorkflowEvent],
     deciders: Map[Workflow, Decider]): Iterable[Decision] = {
-
-    this.previousId = previousId
-    this.newId = newId
 
     val state = createDecisionState(events)
     var failed = false
@@ -91,21 +83,16 @@ final class DecisionImpl()
 
   private[this] def handleWorkflowExecutionStarted(
     event: WorkflowEvent.WorkflowExecutionStarted,
-    deciders: Map[Workflow, Decider]): Option[Throwable] = {
+    deciders: Map[Workflow, Decider]): Unit = {
     info(s"Handling workflow started event: ${event.id}")
 
     // Find the decider responsible for the start event
-    try {
-      deciders(event.workflow)(this, event.input)
-      None
-    } catch {
-      case NonFatal(e) => Some(e)
-    }
+    deciders(event.workflow)(this, event.input)
   }
 
   private[this] def handleActivityTaskCompleted(
     event: WorkflowEvent.ActivityTaskCompleted,
-    state: Map[Long, WorkflowEvent]): Option[Throwable] = {
+    state: Map[Long, WorkflowEvent]): Unit = {
 
     info(s"Handling activity completed event: ${event.id}")
 
@@ -115,26 +102,19 @@ final class DecisionImpl()
     val id = task.activityId.toInt
     val signal = removeSignal(id)
 
-    // Execute the later!
-    try {
-      signal.asInstanceOf[Signal[String]] success event.result
-      None
-    } catch {
-      case NonFatal(e) => Some(e)
-    }
+    // Complete the later for the Schedule task
+    signal.asInstanceOf[Signal[String]] success event.result
+
+    // TODO: handle the failure case
   }
 
-  private[this] def handleTimerFired(event: WorkflowEvent.TimerFired): Option[Throwable] = {
+  private[this] def handleTimerFired(event: WorkflowEvent.TimerFired): Unit = {
     info(s"Handling timer fired event: ${event.id}")
 
     val signal = removeSignal(event.timerId.toInt)
 
-    try {
-      signal.asInstanceOf[Signal[Unit]].success()
-      None
-    } catch {
-      case NonFatal(e) => Some(e)
-    }
+    // Complete the later for the Timer task
+    signal.asInstanceOf[Signal[Unit]].success()
   }
 }
 
@@ -180,13 +160,13 @@ trait InternalDeciderContext extends DeciderContext {
     signal.later
   }
 
-  def completeWorkflow(result: String) {
+  def completeWorkflow(result: String): Unit = {
     if (isLive) {
       decisions += Decision.CompleteWorkflow(result)
     }
   }
 
-  def failWorkflow(reason: String, details: String) {
+  def failWorkflow(reason: String, details: String): Unit = {
     if (isLive) {
       decisions += Decision.FailWorkflow(reason, details)
     }
@@ -204,4 +184,3 @@ trait InternalDeciderContext extends DeciderContext {
     }
   }
 }
-

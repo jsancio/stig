@@ -5,10 +5,8 @@ import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflowClient
 import stig.ActivityManager
 import stig.ActivityRegistration
 import stig.DeciderContext
-import stig.DeciderRegistration
 import stig.DecisionManager
-import stig.model.Workflow
-import stig.model.Activity
+import stig.model.{ Workflow, Activity }
 import stig.WorkerContext
 
 object SimpleTest extends App {
@@ -22,7 +20,7 @@ object SimpleTest extends App {
     domain,
     taskList,
     client,
-    Seq(DeciderRegistration(Workflow("simple-workflow", "1.1"), decider)))
+    Map(Workflow("simple-workflow", "1.1") -> decider))
 
   val activityManager = new ActivityManager(
     domain,

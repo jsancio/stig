@@ -1,89 +1,79 @@
 package stig
 
-import java.net.InetAddress
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.UUID
+import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
+import java.lang.management.ManagementFactory
+import java.util.concurrent.Executors
 
-import concurrent.duration.DurationInt
 import collection.JavaConverters._
-import collection.mutable
-import scala.util.Try
+import concurrent.{ Future, ExecutionContext, ExecutionContextExecutorService }
 
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflow
 import com.amazonaws.services.simpleworkflow.model._
 import grizzled.slf4j.Logging
 
-import stig.model.{ Activity, Decision, Workflow, WorkflowEvent, DecisionConverter }
-import stig.util.{ Signal, Later }
+import stig.model.{ Decision, Workflow, DecisionConverter }
 
 final class DecisionManager(
     domain: String,
     taskList: String,
     client: AmazonSimpleWorkflow,
-    registrations: Seq[DeciderRegistration]) extends Logging {
-  private[this] val started = new AtomicBoolean(false)
-  private[this] val shutdown = new AtomicBoolean(false)
+    deciders: Map[Workflow, Decider]) extends Logging {
 
-  def stop() {
-    require(started.get)
-    shutdown.set(true)
+  @volatile private[this] var shutdown = true
+  @volatile private[this] implicit var executor: ExecutionContextExecutorService = null
+
+  def stop(): Unit = synchronized {
+    require(!shutdown)
+    shutdown = true
+    executor.shutdown()
   }
 
-  def start() {
-    require(!started.get)
-    started.set(true)
+  def start(): Unit = synchronized {
+    require(shutdown)
+    shutdown = false
+    executor = ExecutionContext.fromExecutorService(Executors.newSingleThreadExecutor())
 
-    val deciders = registrations.foldLeft(Map[Workflow, Decider]()) {
-      (state, current) => state + (current.workflow -> current.decider)
+    Future {
+      run()
     }
-
-    new Thread(new DecisionRunnable(deciders)).start()
   }
 
-  private[this] final class DecisionRunnable(
-      deciders: Map[Workflow, Decider]) extends Runnable {
-    def run() {
-      try {
-        val name = {
-          val hostname = InetAddress.getLocalHost.getHostName
-          val threadId = Thread.currentThread.getName
+  private def run(): Unit = {
+    try {
+      val name = {
+        val vmName = ManagementFactory.getRuntimeMXBean.getName
+        val threadId = Thread.currentThread.getName
 
-          s"$threadId:$hostname"
+        s"$threadId:$vmName"
+      }
+
+      while (!shutdown) {
+        info("Waiting on a decision task")
+        val decisionTask = pollForDecisionTask(name)
+
+        for (taskToken <- Option(decisionTask.getTaskToken)) {
+          val runId = decisionTask.getWorkflowExecution.getRunId
+          info(s"Processing decision task: $runId")
+
+          val decisions = WorkflowEventsProcessor.makeDecisions(
+            decisionTask.getPreviousStartedEventId,
+            decisionTask.getStartedEventId,
+            decisionTask.getEvents.asScala.map(WorkflowEventConverter.convert).flatten,
+            deciders)
+
+          // TODO: this needs to deal with errors
+          completeDecisionTask(taskToken, decisions)
         }
-
-        while (!shutdown.get) {
-          info("Waiting on a decision task")
-          val decisionTask = pollForDecisionTask(name, domain, taskList)
-
-          for (taskToken <- Option(decisionTask.getTaskToken)) {
-            val runId = decisionTask.getWorkflowExecution.getRunId
-            info(s"Processing decision task: $runId")
-
-            val events = decisionTask.getEvents.asScala.map(WorkflowEventConverter.convert).flatten
-            val previousId = decisionTask.getPreviousStartedEventId
-            val newId = decisionTask.getStartedEventId
-            val context = new DecisionImpl()
-
-            val decisions = context.makeDecisions(previousId, newId, events, deciders)
-
-            // TODO: this needs to deal with errors
-            completeDecisionTask(taskToken, decisions)
-          }
-        }
-      } catch {
-        case e: Throwable => {
-          error("Unhandle exception", e)
-          throw e
-        }
+      }
+    } catch {
+      case e: Throwable => {
+        error("Unhandle exception", e)
+        throw e
       }
     }
   }
 
-  private[this] def pollForDecisionTask(
-    name: String,
-    domain: String,
-    taskList: String): DecisionTask = {
-
+  private def pollForDecisionTask(name: String): DecisionTask = {
     client.pollForDecisionTask(
       new PollForDecisionTaskRequest()
         .withDomain(domain)
@@ -92,9 +82,7 @@ final class DecisionManager(
   }
 
   // TODO: move this
-  private[this] def completeDecisionTask(
-    taskToken: String,
-    decisions: Iterable[Decision]) {
+  private def completeDecisionTask(taskToken: String, decisions: Iterable[Decision]): Unit = {
     val swfDecision = new RespondDecisionTaskCompletedRequest()
       .withTaskToken(taskToken)
 
@@ -106,5 +94,3 @@ final class DecisionManager(
     client.respondDecisionTaskCompleted(swfDecision)
   }
 }
-
-case class DeciderRegistration(workflow: Workflow, decider: Decider)
