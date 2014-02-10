@@ -1,14 +1,20 @@
-package stig.stig.aws
+package stig.aws
 
-import scala.collection.JavaConverters._
+import scala.collection.JavaConverters.{ seqAsJavaListConverter, asScalaBufferConverter }
 
 import java.util.UUID
 
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflow
-import com.amazonaws.services.simpleworkflow.model._
+import com.amazonaws.services.simpleworkflow.model.ListOpenWorkflowExecutionsRequest
+import com.amazonaws.services.simpleworkflow.model.ListClosedWorkflowExecutionsRequest
+import com.amazonaws.services.simpleworkflow.model.ExecutionTimeFilter
+import com.amazonaws.services.simpleworkflow.model.WorkflowExecutionInfo
+import com.amazonaws.services.simpleworkflow.model.TagFilter
+import com.amazonaws.services.simpleworkflow.model.StartWorkflowExecutionRequest
 import org.joda.time.DateTime
 
 import stig.model.Workflow
+import StigConverter.WorkflowConverter
 
 final class ExternalWorkflowClient(domain: String, client: AmazonSimpleWorkflow) {
   def startWorkflow(
@@ -21,9 +27,7 @@ final class ExternalWorkflowClient(domain: String, client: AmazonSimpleWorkflow)
       .withInput(input)
       .withWorkflowId(UUID.randomUUID.toString) // TODO: we may want to change this
       .withTagList(tags.asJava)
-      .withWorkflowType(new WorkflowType()
-        .withName(workflow.name)
-        .withVersion(workflow.version))).getRunId
+      .withWorkflowType(workflow.asAws)).getRunId
   }
 
   def listWorkflow(tag: String): Seq[WorkflowExecutionInfo] = {

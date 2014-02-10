@@ -3,16 +3,20 @@ package stig.aws
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 import java.util.concurrent.Executors
 
-import scala.collection.JavaConverters._
+import scala.collection.JavaConverters.{ asJavaCollectionConverter, asScalaBufferConverter }
 import scala.concurrent.{ Future, ExecutionContext, ExecutionContextExecutorService }
 
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflow
-import com.amazonaws.services.simpleworkflow.model._
+import com.amazonaws.services.simpleworkflow.model.DecisionTask
+import com.amazonaws.services.simpleworkflow.model.PollForDecisionTaskRequest
+import com.amazonaws.services.simpleworkflow.model.RespondDecisionTaskCompletedRequest
+import com.amazonaws.services.simpleworkflow.model.TaskList
 import grizzled.slf4j.Logging
 
-import util.actorName
-import stig.{ Decider, WorkflowEventsProcessor }
 import stig.model.{ Decision, Workflow }
+import stig.{ Decider, Stig }
+import StigConverter.{ DecisionConverter, HistoryEventConverter }
+import util.actorName
 
 final class DecisionManager(
     domain: String,
@@ -51,10 +55,10 @@ final class DecisionManager(
           val runId = decisionTask.getWorkflowExecution.getRunId
           info(s"Processing decision task: $runId")
 
-          val decisions = WorkflowEventsProcessor.makeDecisions(
+          val decisions = Stig.makeDecisions(
             decisionTask.getPreviousStartedEventId,
             decisionTask.getStartedEventId,
-            decisionTask.getEvents.asScala.map(WorkflowEventConverter.convert).flatten,
+            decisionTask.getEvents.asScala.map(_.asStig).flatten,
             deciders)
 
           // TODO: this needs to deal with errors
@@ -77,14 +81,13 @@ final class DecisionManager(
         .withIdentity(name))
   }
 
-  // TODO: move this
   private def completeDecisionTask(taskToken: String, decisions: Iterable[Decision]): Unit = {
     val swfDecision = new RespondDecisionTaskCompletedRequest()
       .withTaskToken(taskToken)
 
     if (decisions.nonEmpty) {
       swfDecision.setDecisions(
-        decisions.map(DecisionConverter.convert).asJavaCollection)
+        decisions.map(_.asAws).asJavaCollection)
     }
 
     client.respondDecisionTaskCompleted(swfDecision)

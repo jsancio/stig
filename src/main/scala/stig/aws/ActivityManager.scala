@@ -2,16 +2,20 @@ package stig.aws
 
 import java.util.concurrent.Executors
 
-import scala.collection.JavaConverters._
 import scala.concurrent.{ Future, ExecutionContext, ExecutionContextExecutorService }
 import scala.util.control.NonFatal
 
 import com.amazonaws.services.simpleworkflow.AmazonSimpleWorkflow
-import com.amazonaws.services.simpleworkflow.model._
+import com.amazonaws.services.simpleworkflow.model.ActivityTask
+import com.amazonaws.services.simpleworkflow.model.PollForActivityTaskRequest
+import com.amazonaws.services.simpleworkflow.model.RespondActivityTaskCompletedRequest
+import com.amazonaws.services.simpleworkflow.model.RespondActivityTaskFailedRequest
+import com.amazonaws.services.simpleworkflow.model.TaskList
 import grizzled.slf4j.Logging
 
 import stig.model.Activity
-import stig.{ Worker, WorkerContextImpl }
+import stig.{ Worker, Stig }
+import StigConverter.ActivityTypeConverter
 import util.actorName
 
 final class ActivityManager(
@@ -50,11 +54,11 @@ final class ActivityManager(
         for (taskToken <- Option(activityTask.getTaskToken)) {
           info(s"Processing activity ${activityTask.getActivityId}")
 
-          val context = new WorkerContextImpl()
           val resultOption = try {
-            val result = workers(convert(activityTask.getActivityType))(
-              context,
-              activityTask.getInput)
+            val result = Stig.executeActivity(
+              activityTask.getActivityType.asStig,
+              activityTask.getInput,
+              workers)
 
             info(s"Finished activity ${activityTask.getActivityId}")
 
@@ -79,10 +83,6 @@ final class ActivityManager(
         throw e
       }
     }
-  }
-
-  private def convert(activityType: ActivityType): Activity = {
-    Activity(activityType.getName, activityType.getVersion)
   }
 
   private def pollForActivityTask(

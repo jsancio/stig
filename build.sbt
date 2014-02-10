@@ -15,4 +15,3 @@ libraryDependencies ++= Seq(
 
 
 scalariformSettings
-
