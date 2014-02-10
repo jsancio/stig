@@ -17,13 +17,20 @@ object WorkflowEvent {
   final case class ActivityTaskScheduled(
     id: Long,
     timestamp: DateTime,
-    activityId: String) extends WorkflowEvent
+    activityId: Int) extends WorkflowEvent
 
   final case class ActivityTaskCompleted(
     id: Long,
     timestamp: DateTime,
     scheduledEventId: Long,
     result: String) extends WorkflowEvent
+
+  final case class ActivityTaskFailed(
+    id: Long,
+    timestamp: DateTime,
+    scheduledEventId: Long,
+    reason: String,
+    details: String) extends WorkflowEvent
 
   final case class TimerFired(
     id: Long,

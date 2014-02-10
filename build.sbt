@@ -15,3 +15,5 @@ libraryDependencies ++= Seq(
 
 
 scalariformSettings
+
+scalacOptions ++= Seq("-deprecation")

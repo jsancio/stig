@@ -50,11 +50,14 @@ final class DecisionImpl(previousId: Long, newId: Long)
           case event: WorkflowEvent.ActivityTaskCompleted =>
             handleActivityTaskCompleted(event, state)
 
+          case event: WorkflowEvent.ActivityTaskFailed =>
+            handleActivityTaskFailed(event, state)
+
           case event: WorkflowEvent.TimerFired =>
             handleTimerFired(event)
 
-          case _ =>
-            debug(s"Skipping event: (${genericEvent.getClass.getName}, ${genericEvent.id})")
+          // Ignore these type of events
+          case _: WorkflowEvent.ActivityTaskScheduled =>
         }
       } catch {
         case NonFatal(failure) =>
@@ -71,14 +74,14 @@ final class DecisionImpl(previousId: Long, newId: Long)
     }
   }
 
-  private[this] def createDecisionState(
+  private def createDecisionState(
     events: Iterable[WorkflowEvent]): Map[Long, WorkflowEvent] = {
     events.foldLeft(Map[Long, WorkflowEvent]()) {
       (state, event) => state + (event.id -> event)
     }
   }
 
-  private[this] def handleWorkflowExecutionStarted(
+  private def handleWorkflowExecutionStarted(
     event: WorkflowEvent.WorkflowExecutionStarted,
     deciders: Map[Workflow, Decider]): Unit = {
     info(s"Handling workflow started event: ${event.id}")
@@ -87,7 +90,7 @@ final class DecisionImpl(previousId: Long, newId: Long)
     deciders(event.workflow)(this, event.input)
   }
 
-  private[this] def handleActivityTaskCompleted(
+  private def handleActivityTaskCompleted(
     event: WorkflowEvent.ActivityTaskCompleted,
     state: Map[Long, WorkflowEvent]): Unit = {
 
@@ -95,14 +98,22 @@ final class DecisionImpl(previousId: Long, newId: Long)
 
     // Handle activity task completed event
     val task = state(event.scheduledEventId).asInstanceOf[WorkflowEvent.ActivityTaskScheduled]
-
-    val id = task.activityId.toInt
-    val signal = removeSignal(id)
+    val signal = removeSignal(task.activityId).asInstanceOf[Signal[String]]
 
     // Complete the later for the Schedule task
-    signal.asInstanceOf[Signal[String]] success event.result
+    signal.success(event.result)
+  }
 
-    // TODO: handle the failure case
+  private def handleActivityTaskFailed(
+    event: WorkflowEvent.ActivityTaskFailed,
+    state: Map[Long, WorkflowEvent]): Unit = {
+
+    info(s"Handling activity failed event: ${event.id}")
+
+    val task = state(event.scheduledEventId).asInstanceOf[WorkflowEvent.ActivityTaskScheduled]
+    val signal = removeSignal(task.activityId).asInstanceOf[Signal[String]]
+
+    signal.failure(new ActivityFailedException(event.reason, event.details))
   }
 
   private[this] def handleTimerFired(event: WorkflowEvent.TimerFired): Unit = {

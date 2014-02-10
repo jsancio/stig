@@ -107,7 +107,7 @@ object StigConverter {
         Some(WorkflowEvent.ActivityTaskScheduled(
           event.getEventId,
           new DateTime(event.getEventTimestamp),
-          attributes.getActivityId))
+          attributes.getActivityId.toInt))
 
       case "ActivityTaskCompleted" =>
         val attributes = event.getActivityTaskCompletedEventAttributes
@@ -117,6 +117,15 @@ object StigConverter {
           attributes.getScheduledEventId,
           attributes.getResult))
 
+      case "ActivityTaskFailed" =>
+        val attributes = event.getActivityTaskFailedEventAttributes
+        Some(WorkflowEvent.ActivityTaskFailed(
+          event.getEventId,
+          new DateTime(event.getEventTimestamp),
+          attributes.getScheduledEventId,
+          attributes.getReason,
+          attributes.getDetails))
+
       case "TimerFired" =>
         val attributes = event.getTimerFiredEventAttributes
         Some(WorkflowEvent.TimerFired(
@@ -124,7 +133,9 @@ object StigConverter {
           new DateTime(event.getEventTimestamp),
           attributes.getTimerId))
 
-      case _ => None
+      case _ =>
+        // TODO: don't have this catch all case
+        None
     }
   }
 
